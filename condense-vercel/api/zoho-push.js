@@ -32,6 +32,9 @@ export default async function handler(req, res) {
         Lead_Source: "Condense Outreach App",
         Description: description || `Status: ${prospect.status}`,
         Individual_LinkedIn: prospect.linkedinUrl || "",
+        Individual_LinkedIn: prospect.linkedinUrl || "",
+        Opted_for_Product_Updates: true,
+        Opted_for_Newsletter: true,
       }]
     };
 
