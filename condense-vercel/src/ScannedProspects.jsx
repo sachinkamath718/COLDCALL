@@ -866,7 +866,18 @@ const b64 = compressed;
     return Math.ceil((t - Date.now()) / 3600000 / 24);
   };
 
- const filteredScanned = scanned.filter(p => {
+const filteredScanned = scanned.filter(p => {
+  const now = Date.now();
+  if (selectedEventFilter === "due_d3") {
+    return p.sentAt
+      && (new Date(p.sentAt).getTime() + 3 * 86400000) <= now
+      && !scannedEdits[`${p.id}_sent_day3_followup`];
+  }
+  if (selectedEventFilter === "due_d7") {
+    return p.sentAt
+      && (new Date(p.sentAt).getTime() + 7 * 86400000) <= now
+      && !scannedEdits[`${p.id}_sent_day7_followup`];
+  }
   if (selectedEventFilter === "direct" && p.eventId) return false;
   if (selectedEventFilter !== "all" && selectedEventFilter !== "direct" && p.eventId !== selectedEventFilter) return false;
   if (!searchQuery.trim()) return true;
@@ -1017,6 +1028,49 @@ const b64 = compressed;
                       fontWeight: selectedEventFilter === "all" ? 600 : 400 }}>
                     📋 All Events ({scannedProspects.length})
                   </button>
+                  {/* Follow-up due filters */}
+{(() => {
+  const now = Date.now();
+  const d3due = scannedProspects.filter(p =>
+    p.sentAt && (new Date(p.sentAt).getTime() + 3 * 86400000) <= now
+    && !scannedEdits[`${p.id}_sent_day3_followup`]
+  ).length;
+  const d7due = scannedProspects.filter(p =>
+    p.sentAt && (new Date(p.sentAt).getTime() + 7 * 86400000) <= now
+    && !scannedEdits[`${p.id}_sent_day7_followup`]
+  ).length;
+
+  return (
+    <>
+      {d3due > 0 && (
+        <button onClick={() => setSelectedEventFilter("due_d3")}
+          style={{ textAlign: "left", padding: "5px 8px", borderRadius: 6, border: "none",
+            background: selectedEventFilter === "due_d3" ? "rgba(229,62,62,0.12)" : "transparent",
+            color: selectedEventFilter === "due_d3" ? "#E53E3E" : C.textMid,
+            fontSize: 11, fontFamily: FONT, cursor: "pointer",
+            fontWeight: selectedEventFilter === "due_d3" ? 600 : 400,
+            display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>🔴 Day 3 Follow-up Due</span>
+          <span style={{ fontSize: 9, fontFamily: MONO, background: "#FFE5E5",
+            padding: "1px 6px", borderRadius: 10, color: "#E53E3E" }}>{d3due}</span>
+        </button>
+      )}
+      {d7due > 0 && (
+        <button onClick={() => setSelectedEventFilter("due_d7")}
+          style={{ textAlign: "left", padding: "5px 8px", borderRadius: 6, border: "none",
+            background: selectedEventFilter === "due_d7" ? "rgba(229,62,62,0.12)" : "transparent",
+            color: selectedEventFilter === "due_d7" ? "#E53E3E" : C.textMid,
+            fontSize: 11, fontFamily: FONT, cursor: "pointer",
+            fontWeight: selectedEventFilter === "due_d7" ? 600 : 400,
+            display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>🟠 Day 7 Follow-up Due</span>
+          <span style={{ fontSize: 9, fontFamily: MONO, background: "#FFF3E0",
+            padding: "1px 6px", borderRadius: 10, color: "#D97706" }}>{d7due}</span>
+        </button>
+      )}
+    </>
+  );
+})()}
 
                   {scannedProspects.filter(p => !p.eventId).length > 0 && (
                     <button onClick={() => setSelectedEventFilter("direct")}
@@ -1642,24 +1696,33 @@ const b64 = compressed;
                             </div>
 
                             {/* Mark sent */}
-                            {edits[`${sel.id}_sent_${activeMsg}`] ? (
+                            {scannedEdits[`${sel.id}_sent_${activeMsg}`] ? (
                               <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8,
                                 padding: "8px 14px", background: "#F0FBF5", border: "1px solid #B8EDD3",
                                 borderRadius: 6 }}>
                                 <span>✅</span>
                                 <span style={{ fontSize: 12, color: C.green, fontFamily: FONT, fontWeight: 500 }}>
-                                  Marked as sent · {new Date(edits[`${sel.id}_sent_${activeMsg}`].sentAt).toLocaleDateString()}
+                                  Marked as sent · {new Date(scannedEdits[`${sel.id}_sent_${activeMsg}`].sentAt).toLocaleDateString()}
                                 </span>
-                                <button onClick={() => setEdits(prev => { const n={...prev}; delete n[`${sel.id}_sent_${activeMsg}`]; return n; })}
+                                <button onClick={() => {
+  const sentKey = `${sel.id}_sent_${activeMsg}`;
+  setScannedEdits(prev => { const n = {...prev}; delete n[sentKey]; return n; });
+  if (supabase) supabase.from("v3_scanned_edits").delete().eq("id", sentKey);
+}}
                                   style={{ marginLeft: "auto", fontSize: 10, color: C.textDim, background: "none", border: "none", cursor: "pointer" }}>undo</button>
                               </div>
                             ) : (
-                              <button onClick={() => {
-                                const sentAt = new Date().toISOString();
-                                setEdits(prev => ({ ...prev, [`${sel.id}_sent_${activeMsg}`]: { sentAt } }));
-                               setScannedProspects(prev => prev.map(p => p.id === sel.id
-  ? { ...p, sentLog: { ...(p.sentLog || {}), [activeMsg]: sentAt } } : p));
-                              }} style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 6,
+                              onClick={() => {
+  const sentAt = new Date().toISOString();
+  const sentKey = `${sel.id}_sent_${activeMsg}`;
+  const sentVal = { sentAt };
+  // Save to scannedEdits (persisted) instead of parent edits
+  setScannedEdits(prev => ({ ...prev, [sentKey]: sentVal }));
+  scannedDbSave("v3_scanned_edits", sentKey, sentVal);
+  setScannedProspects(prev => prev.map(p => p.id === sel.id
+    ? { ...p, sentLog: { ...(p.sentLog || {}), [activeMsg]: sentAt } } : p));
+}}
+                                style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 6,
                                 padding: "8px 16px", borderRadius: 6, border: "1px solid #B8EDD3",
                                 background: "#F0FBF5", color: C.green, fontSize: 12, fontFamily: FONT,
                                 fontWeight: 500, cursor: "pointer" }}>
