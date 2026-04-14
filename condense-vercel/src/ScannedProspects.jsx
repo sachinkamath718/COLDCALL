@@ -337,6 +337,8 @@ export default function ScannedProspects({
   enrichProspect, enriching,
   markSent,
   dbSave,
+  runResearchAgent,      
+  generateMessages,      
   findIndustryUseCases,
   findMatchingStories,
   SUCCESS_STORIES = [],
@@ -492,164 +494,16 @@ useEffect(() => {
 }, []);
 
   
-const runScannedAgent = async (prospect) => {
-  const id = prospect.id;
-  setScannedProspects(prev => prev.map(p =>
-    p.id === id ? { ...p, status: "researching" } : p
-  ));
-  setLogs(prev => ({ ...prev, [id]: [] }));
-  const onLog = (msg) => setLogs(prev => ({
-    ...prev, [id]: [...(prev[id] || []), msg]
-  }));
-
-  const event = events.find(e => e.id === prospect.eventId);
-  const eventName = event ? event.name : "the event";
-  const eventLocation = event ? event.location : "";
-
-  onLog("✍️ Generating Zeliot follow-up messages...");
-
-  try {
-    const body = {
-      contents: [{
-        role: "user",
-        parts: [{ text: `You are writing post-event follow-up emails for Zeliot (connected vehicle platform company).
-
-PROSPECT DETAILS:
-Name: ${prospect.name}
-First Name: ${prospect.firstName}
-Company: ${prospect.company}
-Job Title: ${prospect.jobTitle}
-Email: ${prospect.email}
-Event: ${eventName}${eventLocation ? ` in ${eventLocation}` : ""}
-Discussion Points from meeting: ${prospect.notes || "General discussion about Zeliot Condense platform"}
-Additional Context provided by sender: ${extraContext[prospect.id] || "None"}
-ABOUT ZELIOT CONDENSE:
-- Real-time data streaming platform for connected mobility
-- Low-code/no-code pipeline builder
-- Ready-made connectors for analytics and downstream systems
-- AI-assisted IDE with built-in Git integration
-- Use cases: live vehicle tracking, driver behaviour analytics, predictive maintenance, routing optimisation, real-time alerts
-- Free trial available on live instance
-
-STYLE — follow these REAL Zeliot event follow-up examples EXACTLY:
-
-EXAMPLE 1:
-"Hi K R Bharathan,
-It was great connecting with you at Mobility Live 2025, Indonesia. Hope you had a productive event and a safe trip back.
-
-At Zeliot, we built Condense to make it much easier for Mobility Companies to move from raw telemetry and sensor data to real-time, production-ready use cases, without wrestling with complex streaming infrastructure. With Condense, your team can:
-- Ingest data from vehicles, devices, and apps in real time
-- Orchestrate pipelines visually with a low-code/no-code builder
-- Deliver data into your existing analytics, dashboards, and downstream systems with ready-made connectors
-- Write and deploy custom streaming logic in one click with Condense AI-assisted IDE and built-in Git integration
-
-This is especially useful for use cases like live vehicle tracking, driver behaviour analytics, predictive maintenance, routing optimisation, and real-time alerts, where latency and reliability directly impact operations and customer experience.
-
-If you are exploring how to modernise or scale your mobility data stack, you can try Condense hands-on and build a pipeline yourself in a few minutes.
-
-Would you be open to a quick 15-minute discussion to map your current architecture and see where Condense can help? You can pick a slot that works for you here: Book a Meeting, or just reply with a preferred time and time zone."
-
-EXAMPLE 2 (when discussion points exist):
-"Hi Jayasimha,
-Following up on our discussion at Excon 23, I'm excited to share how Zeliot's Condense platform can address the specific needs we discussed.
-
-As per our discussion at Excon, I have exclusively prepared insights on [discussion topic]. We would be delighted to showcase a live demo of the entire Zeliot Condense platform at your convenience. This presents a great opportunity to experience the capabilities of the system firsthand and discuss how it can specifically benefit ${prospect.company}.
-
-Please let me know your availability for a demo, and we'll be happy to schedule a time that works best for you. We're confident that Zeliot Condense can make a real difference and provide significant value to your operations.
-
-Thanks & Regards,"
-RULES:
-- Always use first name only (${prospect.firstName || prospect.name.split(" ")[0]})
-- Always reference the specific event: "${eventName}"
-- If discussion_details exist, mention them specifically as "In our discussion, we touched upon..."
-- Keep it warm, professional, not salesy
-- Ask for 15-minute call
-- Sign off without signature block
-
-Generate ALL these messages:
-
-connection_note: Max 300 chars. Warm LinkedIn note referencing ${eventName}.
-day0_message: LinkedIn first message after connecting. Reference event + discussion points if any. If additional context exists, use it to personalise. 80-120 words.
-day3_followup: 50-80 words. Different angle. If additional context mentions a specific pain/tech/use case, reference that. Otherwise reference a specific Condense capability.
-day7_followup: 30-50 words. Soft follow-up. Mention free trial.
-day14_followup: 20-35 words. Final gentle nudge.
-email_subject: Under 60 chars. Format: "Zeliot <> ${prospect.company} | Continuation from ${eventName}"
-email_body: Full email following this EXACT structure:
-- Line 1: "Hi [FirstName],"
-- Line 2: "Following up on our discussion at ${eventName}, [one line about excitement to continue]."
-- Line 3: "As per our discussion at ${eventName}, I have exclusively prepared [reference to discussion points: ${prospect.notes}]. We would be delighted to showcase a live demo of the entire Zeliot Condense platform at your convenience. This presents a great opportunity to experience the capabilities of the system firsthand and discuss how it can specifically benefit [company]."
-- If discussion_details exist, add: "In our discussion, we specifically touched upon: [list each discussion point as a bullet]"
-- Line: "Please let me know your availability for a demo, and we'll be happy to schedule a time that works best for you. We're confident that Zeliot Condense can make a real difference and provide significant value addition to your stakeholders."
-- End with: "Thanks & Regards,"
-- NO signature block, NO links unless naturally fitting
-- Keep it 150-250 words. Warm, specific, not salesy.
-- If NO discussion points: use Example 1 style with Condense feature bullets instead.
-- If "Additional Context provided by sender" exists, weave it naturally into the email body. 
-  For example if it says "he was interested in mining use case" mention that specifically.
-  If it says "he uses Kafka" mention Condense as a simpler alternative to Kafka.
-  If it says "met at booth 23B" mention that specifically.
-  Always prioritise additional context over generic content.
-email_followup1: 3-4 short paragraphs. Different angle. No salutation. No signature.
-email_followup2: 2-3 short paragraphs. Final nudge. No salutation. No signature.
-
-Return ONLY valid JSON:
-{
-  "connection_note": "...",
-  "day0_message": "...",
-  "day3_followup": "...",
-  "day7_followup": "...",
-  "day14_followup": "...",
-  "email_subject": "...",
-  "email_body": "...",
-  "email_followup1": "...",
-  "email_followup2": "..."
-}` }]
-      }],
-      generationConfig: { maxOutputTokens: 4000, temperature: 0.3 },
-    };
-
-    const res = await fetch("/api/gemini", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    const data = await res.json();
-    const text = (data.candidates?.[0]?.content?.parts || [])
-      .map(p => p.text || "").join("").trim();
-
-    const cleaned = text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-    const msgs = JSON.parse(cleaned.slice(start, end + 1));
-
-    Object.keys(msgs).forEach(k => {
-      if (typeof msgs[k] === "string") {
-        msgs[k] = msgs[k].replace(/\\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
-      }
-    });
-
-    setScannedMessages(prev => ({ ...prev, [id]: msgs }));
-    scannedDbSave("v3_scanned_messages", id, msgs);
-
-    setScannedProspects(prev => prev.map(p => {
-      if (p.id !== id) return p;
-      const updated = { ...p, status: "ready" };
-      scannedDbSave("v3_scanned_prospects", id, updated);
-      return updated;
-    }));
-
-    setActiveMsg("email_body");
-    setActiveTab("messages");
-    onLog("✅ Messages generated!");
-
-  } catch (err) {
-    setScannedProspects(prev => prev.map(p =>
-      p.id === id ? { ...p, status: "error" } : p
-    ));
-    onLog("❌ Error: " + err.message);
-  }
-};
+useEffect(() => {
+  scannedProspects.forEach(p => {
+    if (p.status !== "researching" && p.status !== "generating") return;
+    const r = research[p.id];
+    const m = messages[p.id];
+    if (m) {
+      // ...
+    }
+  });
+}, [research, messages]);
   // ── Scanner: file upload ──────────────────────────────────────────────────
   const handleFileSelect = async (file) => {
     if (!file) return;
