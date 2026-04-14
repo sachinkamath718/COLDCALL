@@ -1352,13 +1352,7 @@ const b64 = compressed;
                           ↺ Regen
                         </button>
                       )}
-
-                      {/* Mark Sent */}
-                      {sel.status === "ready" && (
-                        <PrimaryBtn onClick={() => markSent?.(sel.id)} color={C.green}>
-                          ✓ Mark Sent
-                        </PrimaryBtn>
-                      )}
+                      
 
                       {/* Enrich — always show (mirrors Prospects page) */}
                       <button onClick={() => enrichProspect?.(sel)}
