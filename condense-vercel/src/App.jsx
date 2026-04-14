@@ -174,7 +174,7 @@ async function dbLoad(table) {
 }
 
 // ─── GEMINI API WRAPPER ───────────────────────────────────────────────────────
-async function callClaude({ system, messages, max_tokens = 1500, _retry = 0 }) {
+async function callGemini({ system, messages, max_tokens = 1500, _retry = 0 }) {
   const contents = messages.map((msg) => {
     const role = msg.role === "assistant" ? "model" : "user";
     let parts;
@@ -208,7 +208,7 @@ async function callClaude({ system, messages, max_tokens = 1500, _retry = 0 }) {
         const wait = (_retry + 1) * 8000;
         console.warn(`Gemini ${res.status} — retrying in ${wait/1000}s (attempt ${_retry + 1}/3)`);
         await new Promise(r => setTimeout(r, wait));
-        return callClaude({ system, messages, max_tokens, _retry: _retry + 1 });
+        return callGemini({ system, messages, max_tokens, _retry: _retry + 1 });
       }
       throw new Error(`Gemini rate limit after 3 retries`);
     }
@@ -225,7 +225,7 @@ async function callClaude({ system, messages, max_tokens = 1500, _retry = 0 }) {
         const wait = (_retry + 1) * 8000;
         console.warn(`Gemini quota — retrying in ${wait/1000}s`);
         await new Promise(r => setTimeout(r, wait));
-        return callClaude({ system, messages, max_tokens, _retry: _retry + 1 });
+        return callGemini({ system, messages, max_tokens, _retry: _retry + 1 });
       }
       throw new Error(data.error.message || "Gemini API error");
     }
@@ -242,7 +242,7 @@ async function callClaude({ system, messages, max_tokens = 1500, _retry = 0 }) {
     if (_retry < 2 && !err.message.includes("blocked") && !err.message.includes("empty")) {
       console.warn(`callClaude failed, retrying: ${err.message}`);
       await new Promise(r => setTimeout(r, 5000));
-      return callClaude({ system, messages, max_tokens, _retry: _retry + 1 });
+      return callGemini({ system, messages, max_tokens, _retry: _retry + 1 });
     }
     throw err;
   }
@@ -325,7 +325,7 @@ Provide detailed research across ALL these areas:
   "confidence_score": 80
 }`;
 
-  const data = await callClaude({
+  const data = await callGemini({
     system: "You are a B2B research agent. Return ONLY valid JSON. Start with { and end with }. No markdown, no preamble.",
     messages: [{ role: "user", content: researchPrompt }],
     max_tokens: 3000,
@@ -660,7 +660,7 @@ Return ONLY this JSON:
   ]
 }`;
 
-  const data2 = await callClaude({
+  const data2 = await callGemini({
     system: "You are Veera Raghavan. Study the training examples and replicate the style precisely. Return ONLY valid JSON. Start with { and end with }.",
     messages: [{ role: "user", content: prompt }],
     max_tokens: 4000,
@@ -1406,7 +1406,7 @@ Return ONLY valid JSON:
 }`;
 
   try {
-    const data = await callClaude({
+    const data = await callGemini({
       system: "You are a B2B research agent specializing in data infrastructure. Return ONLY valid JSON. Start with { and end with }. No markdown.",
       messages: [{ role: "user", content: prompt }],
      max_tokens: 3000,
@@ -1654,7 +1654,7 @@ Return ONLY valid JSON:
 }`;
 
   try {
-    const data = await callClaude({
+    const data = await callGemini({
       system: "You are Veera Raghavan. Return ONLY valid JSON. Start with { and end with }. No markdown.",
       messages: [{ role: "user", content: prompt }],
       max_tokens: 3500,
