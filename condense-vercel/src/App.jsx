@@ -1858,14 +1858,6 @@ if (!dbLoaded) return (
             </div>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-              <span style={{ fontSize: 18, fontFamily: DISPLAY, fontWeight: 700, color: prospects.filter(p => p.status === "ready" || p.status === "following").length > 0 ? "#5DE8A0" : "rgba(255,255,255,0.25)", lineHeight: 1 }}>{prospects.filter(p => p.status === "ready" || p.status === "following").length}</span>
-              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", fontFamily: MONO, letterSpacing: "0.06em" }}>Active</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-              <span style={{ fontSize: 18, fontFamily: DISPLAY, fontWeight: 700, color: replies.length > 0 ? "#FFC043" : "rgba(255,255,255,0.25)", lineHeight: 1 }}>{replies.length}</span>
-              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", fontFamily: MONO, letterSpacing: "0.06em" }}>Trained</span>
-            </div>
             {(() => {
 const NAV_ITEMS = [
     { key: "prospects", label: "🎯 Prospects" },
