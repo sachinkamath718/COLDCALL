@@ -257,23 +257,45 @@ const [scannedResearch, setScannedResearch]   = useState({});
 const [scannedMessages, setScannedMessages]   = useState({});
 const [scannedEdits, setScannedEdits]         = useState({});
 const [scannedLoaded, setScannedLoaded]       = useState(false);
+const [events, setEvents]                     = useState([]);
+const [selectedEventFilter, setSelectedEventFilter] = useState("all");
   const [cameraOpen, setCameraOpen]       = useState(false);
   const [cameraStream, setCameraStream]   = useState(null);
-  useEffect(() => {
+ useEffect(() => {
   async function loadScanned() {
     if (!supabase) { setScannedLoaded(true); return; }
     try {
-      const [p, r, m, e] = await Promise.all([
-        supabase.from("v3_scanned_prospects").select("id, data"),
-        supabase.from("v3_scanned_research").select("id, data"),
-        supabase.from("v3_scanned_messages").select("id, data"),
-        supabase.from("v3_scanned_edits").select("id, data"),
-      ]);
-      setScannedProspects((p.data || []).map(r => r.data).sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt)));
-      setScannedResearch(Object.fromEntries((r.data || []).map(r => [r.id, r.data])));
-      setScannedMessages(Object.fromEntries((m.data || []).map(r => [r.id, r.data])));
-      setScannedEdits(Object.fromEntries((e.data || []).map(r => [r.id, r.data])));
-    } catch(err) { console.error("loadScanned error:", err); }
+      const { data: eventsData } = await supabase
+        .from("events")
+        .select("*")
+        .order("created_at", { ascending: false });
+      setEvents(eventsData || []);
+
+      const { data: contactsData } = await supabase
+        .from("contacts")
+        .select("*")
+        .order("scanned_at", { ascending: false });
+
+      const mapped = (contactsData || []).map(c => ({
+        id: c.id,
+        name: `${c.first_name || ""} ${c.last_name || ""}`.trim(),
+        firstName: c.first_name || "",
+        lastName: c.last_name || "",
+        company: c.company_name || "",
+        jobTitle: c.job_title || "",
+        email: c.email || "",
+        phone: c.phone_number || "",
+        notes: c.discussion_details || "",
+        eventId: c.event_id || "",
+        source: "scanned",
+        status: "idle",
+        createdAt: c.scanned_at || new Date().toISOString(),
+      }));
+
+      setScannedProspects(mapped);
+    } catch(err) {
+      console.error("loadScanned error:", err);
+    }
     setScannedLoaded(true);
   }
   loadScanned();
@@ -327,18 +349,153 @@ useEffect(() => {
 
   
 const runScannedAgent = async (prospect) => {
-  // Prevent duplicate entries in scannedProspects
-  setScannedProspects(prev => {
-    const exists = prev.filter(p => p.id === prospect.id);
-    if (exists.length > 1) {
-      // deduplicate — keep only the first
-      return prev.filter((p, i) => p.id !== prospect.id || i === prev.findIndex(x => x.id === prospect.id));
-    }
-    return prev.map(p => p.id === prospect.id ? { ...p, status: "researching" } : p);
-  });
-  setRunning(prospect.id);
-  await runAgent?.(prospect);
-  setRunning(null);
+  const id = prospect.id;
+  setScannedProspects(prev => prev.map(p =>
+    p.id === id ? { ...p, status: "researching" } : p
+  ));
+  setLogs(prev => ({ ...prev, [id]: [] }));
+  const onLog = (msg) => setLogs(prev => ({
+    ...prev, [id]: [...(prev[id] || []), msg]
+  }));
+
+  const event = events.find(e => e.id === prospect.eventId);
+  const eventName = event ? event.name : "the event";
+  const eventLocation = event ? event.location : "";
+
+  onLog("✍️ Generating Zeliot follow-up messages...");
+
+  try {
+    const body = {
+      contents: [{
+        role: "user",
+        parts: [{ text: `You are writing post-event follow-up emails for Zeliot (connected vehicle platform company).
+
+PROSPECT DETAILS:
+Name: ${prospect.name}
+First Name: ${prospect.firstName}
+Company: ${prospect.company}
+Job Title: ${prospect.jobTitle}
+Email: ${prospect.email}
+Event: ${eventName}${eventLocation ? ` in ${eventLocation}` : ""}
+Discussion Points from meeting: ${prospect.notes || "General discussion about Zeliot Condense platform"}
+
+ABOUT ZELIOT CONDENSE:
+- Real-time data streaming platform for connected mobility
+- Low-code/no-code pipeline builder
+- Ready-made connectors for analytics and downstream systems
+- AI-assisted IDE with built-in Git integration
+- Use cases: live vehicle tracking, driver behaviour analytics, predictive maintenance, routing optimisation, real-time alerts
+- Free trial available on live instance
+
+STYLE — follow these REAL Zeliot event follow-up examples EXACTLY:
+
+EXAMPLE 1:
+"Hi K R Bharathan,
+It was great connecting with you at Mobility Live 2025, Indonesia. Hope you had a productive event and a safe trip back.
+
+At Zeliot, we built Condense to make it much easier for Mobility Companies to move from raw telemetry and sensor data to real-time, production-ready use cases, without wrestling with complex streaming infrastructure. With Condense, your team can:
+- Ingest data from vehicles, devices, and apps in real time
+- Orchestrate pipelines visually with a low-code/no-code builder
+- Deliver data into your existing analytics, dashboards, and downstream systems with ready-made connectors
+- Write and deploy custom streaming logic in one click with Condense AI-assisted IDE and built-in Git integration
+
+This is especially useful for use cases like live vehicle tracking, driver behaviour analytics, predictive maintenance, routing optimisation, and real-time alerts, where latency and reliability directly impact operations and customer experience.
+
+If you are exploring how to modernise or scale your mobility data stack, you can try Condense hands-on and build a pipeline yourself in a few minutes.
+
+Would you be open to a quick 15-minute discussion to map your current architecture and see where Condense can help? You can pick a slot that works for you here: Book a Meeting, or just reply with a preferred time and time zone."
+
+EXAMPLE 2 (when discussion points exist):
+"Hi Bharath,
+I hope you had a pleasant journey back from the Bharat Mobility Expo. It was a pleasure meeting you.
+
+In our discussions, we touched upon the following points:
+- USP of our Connected Vehicle platform "Condense" and the solutions it could power.
+- Edge analytics capability of CondenseEdge and its unique value proposition.
+- [Their specific requirements]
+
+I am excited about the prospect of further exploring how Zeliot's innovative solutions can cater to your specific needs. To this end, I kindly request you to let us know your availability for a more in-depth discussion in the coming week."
+
+RULES:
+- Always use first name only (${prospect.firstName || prospect.name.split(" ")[0]})
+- Always reference the specific event: "${eventName}"
+- If discussion_details exist, mention them specifically as "In our discussion, we touched upon..."
+- Keep it warm, professional, not salesy
+- Ask for 15-minute call
+- Sign off without signature block
+
+Generate ALL these messages:
+
+connection_note: Max 300 chars. Warm LinkedIn note referencing ${eventName}.
+day0_message: LinkedIn first message after connecting. Reference event + discussion points if any. 80-120 words.
+day3_followup: 50-80 words. Different angle. Reference a specific Condense capability.
+day7_followup: 30-50 words. Soft follow-up. Mention free trial.
+day14_followup: 20-35 words. Final gentle nudge.
+email_subject: Under 60 chars. Format: "Zeliot <> ${prospect.company} | Continuation from ${eventName}"
+email_body: Full email exactly like Example 1 or 2 above. 300-400 words. Reference discussion points if available. Include these links:
+  - Condense overview: https://zeliot.in/condense
+  - Case studies: https://www.zeliot.in/blog
+  - Book meeting: https://calendly.com/zeliot
+email_followup1: 3-4 short paragraphs. Different angle. No salutation. No signature.
+email_followup2: 2-3 short paragraphs. Final nudge. No salutation. No signature.
+
+Return ONLY valid JSON:
+{
+  "connection_note": "...",
+  "day0_message": "...",
+  "day3_followup": "...",
+  "day7_followup": "...",
+  "day14_followup": "...",
+  "email_subject": "...",
+  "email_body": "...",
+  "email_followup1": "...",
+  "email_followup2": "..."
+}` }]
+      }],
+      generationConfig: { maxOutputTokens: 4000, temperature: 0.3 },
+    };
+
+    const res = await fetch("/api/gemini", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json();
+    const text = (data.candidates?.[0]?.content?.parts || [])
+      .map(p => p.text || "").join("").trim();
+
+    const cleaned = text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    const msgs = JSON.parse(cleaned.slice(start, end + 1));
+
+    Object.keys(msgs).forEach(k => {
+      if (typeof msgs[k] === "string") {
+        msgs[k] = msgs[k].replace(/\\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+      }
+    });
+
+    setScannedMessages(prev => ({ ...prev, [id]: msgs }));
+    scannedDbSave("v3_scanned_messages", id, msgs);
+
+    setScannedProspects(prev => prev.map(p => {
+      if (p.id !== id) return p;
+      const updated = { ...p, status: "ready" };
+      scannedDbSave("v3_scanned_prospects", id, updated);
+      return updated;
+    }));
+
+    setActiveMsg("email_body");
+    setActiveTab("messages");
+    onLog("✅ Messages generated!");
+
+  } catch (err) {
+    setScannedProspects(prev => prev.map(p =>
+      p.id === id ? { ...p, status: "error" } : p
+    ));
+    onLog("❌ Error: " + err.message);
+  }
 };
   // ── Scanner: file upload ──────────────────────────────────────────────────
   const handleFileSelect = async (file) => {
@@ -477,11 +634,13 @@ const b64 = compressed;
     return Math.ceil((t - Date.now()) / 3600000 / 24);
   };
 
-  const filteredScanned = scanned.filter(p => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return (p.name || "").toLowerCase().includes(q) || (p.company || "").toLowerCase().includes(q);
-  });
+ const filteredScanned = scanned.filter(p => {
+  if (selectedEventFilter !== "all" && p.eventId !== selectedEventFilter) return false;
+  if (!searchQuery.trim()) return true;
+  const q = searchQuery.toLowerCase();
+  return (p.name || "").toLowerCase().includes(q) ||
+         (p.company || "").toLowerCase().includes(q);
+});
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -591,6 +750,40 @@ const b64 = compressed;
               )}
             </div>
           </div>
+
+          {/* Event Filter */}
+          {events.length > 0 && (
+            <div style={{ padding: "8px 12px", borderBottom: "1px solid #EEF2F7", flexShrink: 0 }}>
+              <div style={{ fontSize: 9, color: C.textDim, fontFamily: MONO,
+                letterSpacing: "0.08em", marginBottom: 6 }}>FILTER BY EVENT</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <button
+                  onClick={() => setSelectedEventFilter("all")}
+                  style={{ textAlign: "left", padding: "5px 8px", borderRadius: 6, border: "none",
+                    background: selectedEventFilter === "all" ? C.goldDim : "transparent",
+                    color: selectedEventFilter === "all" ? C.gold : C.textMid,
+                    fontSize: 11, fontFamily: FONT, cursor: "pointer", fontWeight: selectedEventFilter === "all" ? 600 : 400 }}>
+                  📋 All Events ({scannedProspects.length})
+                </button>
+                {events.map(ev => {
+                  const count = scannedProspects.filter(p => p.eventId === ev.id).length;
+                  return (
+                    <button key={ev.id}
+                      onClick={() => setSelectedEventFilter(ev.id)}
+                      style={{ textAlign: "left", padding: "5px 8px", borderRadius: 6, border: "none",
+                        background: selectedEventFilter === ev.id ? C.goldDim : "transparent",
+                        color: selectedEventFilter === ev.id ? C.gold : C.textMid,
+                        fontSize: 11, fontFamily: FONT, cursor: "pointer", fontWeight: selectedEventFilter === ev.id ? 600 : 400,
+                        display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span>🎪 {ev.name}</span>
+                      <span style={{ fontSize: 9, fontFamily: MONO, background: "#EEF2F7",
+                        padding: "1px 6px", borderRadius: 10, color: C.textDim }}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Prospect list */}
           <div style={{ flex: 1, overflowY: "auto" }}>
@@ -845,11 +1038,27 @@ const b64 = compressed;
                             style={{ fontSize: 10, color: "#0077B5", fontFamily: MONO }}>💼 LinkedIn</a>}
                           {sel.region    && <span style={{ fontSize: 10, color: C.textDim, fontFamily: MONO }}>📍 {sel.region}</span>}
                         </div>
-                        {sel.notes && (
+                       {sel.notes && (
                           <div style={{ marginTop: 8, fontSize: 11, color: C.textDim, fontFamily: FONT,
                             background: "#F8FAFC", padding: "6px 10px", borderRadius: 6,
                             border: "1px solid #E4ECF4", maxWidth: 460 }}>{sel.notes}</div>
                         )}
+                        {(() => {
+                          const ev = events.find(e => e.id === sel.eventId);
+                          return ev ? (
+                            <div style={{ display: "inline-flex", alignItems: "center", gap: 6,
+                              background: "#F0F4FF", border: "1px solid #B8CCFF",
+                              borderRadius: 20, padding: "3px 10px", marginTop: 6 }}>
+                              <span style={{ fontSize: 10 }}>🎪</span>
+                              <span style={{ fontSize: 11, color: C.gold, fontFamily: FONT, fontWeight: 600 }}>
+                                {ev.name}
+                              </span>
+                              {ev.date && <span style={{ fontSize: 10, color: C.textDim, fontFamily: MONO }}>
+                                · {new Date(ev.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                              </span>}
+                            </div>
+                          ) : null;
+                        })()}
                       </div>
                     </div>
 
