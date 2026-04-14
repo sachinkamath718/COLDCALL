@@ -1157,6 +1157,7 @@ const b64 = compressed;
                     <div style={{ fontSize: 13, fontWeight: 600, color: C.navy }}>Reading card...</div>
                    <div style={{ fontSize: 11, color: C.textDim, fontFamily: MONO }}>Extracting contact details...</div>
                 </div>
+            </div>
               )}
 
               {/* Preview + edit form */}
