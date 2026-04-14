@@ -217,6 +217,110 @@ function fileToBase64(file) {
   });
 }
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
+function EventAssignModal({ events, onSelect, onCreateNew, onSkip }) {
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName]   = useState("");
+  const [newDate, setNewDate]   = useState(new Date().toISOString().split("T")[0]);
+  const [newLoc, setNewLoc]     = useState("");
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(10,37,64,0.55)",
+      zIndex: 600, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: "#fff", borderRadius: 16, padding: 28, width: 420,
+        boxShadow: "0 20px 60px rgba(10,37,64,0.2)", maxHeight: "80vh",
+        display: "flex", flexDirection: "column", gap: 16 }}>
+
+        <div style={{ fontFamily: DISPLAY, fontSize: 16, fontWeight: 700, color: C.navy }}>
+          Assign to Event
+        </div>
+        <div style={{ fontSize: 12, color: C.textDim }}>
+          Which event was this card scanned at?
+        </div>
+
+        {!creating && (
+          <div style={{ overflowY: "auto", maxHeight: 260, display: "flex",
+            flexDirection: "column", gap: 6 }}>
+            {events.map(ev => (
+              <button key={ev.id} onClick={() => onSelect(ev)}
+                style={{ textAlign: "left", padding: "10px 14px", borderRadius: 8,
+                  border: "1px solid #E4ECF4", background: "#F8FAFC", cursor: "pointer",
+                  fontFamily: FONT, fontSize: 13, color: C.navy,
+                  display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                onMouseEnter={e => e.currentTarget.style.background = C.goldDim}
+                onMouseLeave={e => e.currentTarget.style.background = "#F8FAFC"}>
+                <span>🎪 {ev.name}</span>
+                {ev.date && <span style={{ fontSize: 10, color: C.textDim, fontFamily: MONO }}>
+                  {new Date(ev.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                </span>}
+              </button>
+            ))}
+            {events.length === 0 && (
+              <div style={{ fontSize: 12, color: C.textDim, textAlign: "center", padding: "16px 0" }}>
+                No events yet. Create one below.
+              </div>
+            )}
+          </div>
+        )}
+
+        {creating && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {[
+              { label: "Event Name *", val: newName, set: setNewName, placeholder: "e.g. Excon 2025" },
+              { label: "Date", val: newDate, set: setNewDate, type: "date" },
+              { label: "Location", val: newLoc, set: setNewLoc, placeholder: "e.g. Bengaluru, India" },
+            ].map(f => (
+              <div key={f.label}>
+                <label style={{ fontSize: 10, color: C.textMid, display: "block",
+                  marginBottom: 3, fontFamily: FONT, fontWeight: 500 }}>{f.label}</label>
+                <input type={f.type || "text"} value={f.val}
+                  onChange={e => f.set(e.target.value)}
+                  placeholder={f.placeholder || ""}
+                  style={{ width: "100%", background: "#F8FAFC", border: "1px solid #D8E2EE",
+                    color: C.text, borderRadius: 6, padding: "8px 10px", fontSize: 12,
+                    fontFamily: FONT, outline: "none", boxSizing: "border-box" }} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {!creating ? (
+            <>
+              <button onClick={() => setCreating(true)}
+                style={{ flex: 1, padding: "9px 14px", borderRadius: 6, border: "none",
+                  background: `linear-gradient(135deg, ${C.gold}, ${C.goldBright})`,
+                  color: "#fff", fontWeight: 600, fontSize: 12, fontFamily: FONT, cursor: "pointer" }}>
+                + Create New Event
+              </button>
+              <button onClick={onSkip}
+                style={{ padding: "9px 14px", borderRadius: 6, border: "1px solid #E4ECF4",
+                  background: "#fff", color: C.textMid, fontSize: 12, fontFamily: FONT, cursor: "pointer" }}>
+                📷 Direct Scan
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => onCreateNew({ name: newName, date: newDate, location: newLoc })}
+                disabled={!newName.trim()}
+                style={{ flex: 1, padding: "9px 14px", borderRadius: 6, border: "none",
+                  background: newName.trim() ? `linear-gradient(135deg, ${C.green}, #12C47E)` : "#E4ECF4",
+                  color: newName.trim() ? "#fff" : C.textDim,
+                  fontWeight: 600, fontSize: 12, fontFamily: FONT,
+                  cursor: newName.trim() ? "pointer" : "not-allowed" }}>
+                ✓ Save & Assign
+              </button>
+              <button onClick={() => setCreating(false)}
+                style={{ padding: "9px 14px", borderRadius: 6, border: "1px solid #E4ECF4",
+                  background: "#fff", color: C.textMid, fontSize: 12, fontFamily: FONT, cursor: "pointer" }}>
+                ← Back
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 export default function ScannedProspects({
   prospects = [], setProspects,
   research = {}, setResearch,
@@ -261,6 +365,9 @@ const [events, setEvents]                     = useState([]);
 const [selectedEventFilter, setSelectedEventFilter] = useState("all");
   const [cameraOpen, setCameraOpen]       = useState(false);
   const [cameraStream, setCameraStream]   = useState(null);
+  const [eventsExpanded, setEventsExpanded]   = useState(true);
+const [pendingSave, setPendingSave]         = useState(null);
+const [showEventModal, setShowEventModal]   = useState(false);
 useEffect(() => {
   async function loadScanned() {
     if (!supabase) { setScannedLoaded(true); return; }
@@ -630,17 +737,53 @@ const b64 = compressed;
   // ── Save extracted card as prospect ──────────────────────────────────────
  const saveScanned = () => {
     if (!editForm?.name && !editForm?.company) return;
-    const id = `sc_${Date.now()}`;
+    setPendingSave({ editForm: { ...editForm }, preview });
+    setShowEventModal(true);
+  };
+
+  const confirmSave = async (eventId, eventName) => {
+    setShowEventModal(false);
+    if (!pendingSave) return;
+    const { editForm: form, preview: cardPreview } = pendingSave;
+    setPendingSave(null);
+
+    let contactId = null;
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("contacts")
+          .insert({
+            first_name: form.name?.split(" ")[0] || "",
+            last_name: form.name?.split(" ").slice(1).join(" ") || "",
+            company_name: form.company || "",
+            job_title: form.jobTitle || "",
+            email: form.email || "",
+            phone_number: form.phone || "",
+            discussion_details: form.notes || "",
+            event_id: eventId || null,
+            scanned_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+        if (!error && data) contactId = String(data.id);
+      } catch (err) {
+        console.error("confirmSave error:", err);
+      }
+    }
+
+    const id = contactId || `sc_${Date.now()}`;
     const today = new Date().toISOString().split("T")[0];
     const newP = {
-      ...editForm,
+      ...form,
       id,
       source: "scanned",
       status: "idle",
+      eventId: eventId || null,
+      eventName: eventName || "Direct Scan",
       createdAt: new Date().toISOString(),
       uploadDate: today,
       sentAt: null,
-      cardPreview: preview,
+      cardPreview,
     };
     setScannedProspects(prev => [newP, ...prev]);
     scannedDbSave("v3_scanned_prospects", id, newP);
@@ -649,6 +792,28 @@ const b64 = compressed;
     setScanSuccess(""); setScanError("");
     setActiveTab("messages");
     setActiveMsg(null);
+  };
+
+  const handleSelectEvent = (ev) => confirmSave(ev.id, ev.name);
+  const handleSkip = () => confirmSave(null, null);
+
+  const handleCreateEvent = async ({ name, date, location }) => {
+    if (!name.trim()) return;
+    let newEvent = { id: `ev_${Date.now()}`, name, date, location };
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from("events")
+          .insert({ name, date: date || null, location: location || "" })
+          .select()
+          .single();
+        if (!error && data) newEvent = data;
+      } catch (err) {
+        console.error("createEvent error:", err);
+      }
+    }
+    setEvents(prev => [newEvent, ...prev]);
+    confirmSave(newEvent.id, newEvent.name);
   };
 
   const discardScan = () => {
@@ -681,7 +846,8 @@ const b64 = compressed;
   };
 
  const filteredScanned = scanned.filter(p => {
-  if (selectedEventFilter !== "all" && p.eventId !== selectedEventFilter) return false;
+  if (selectedEventFilter === "direct" && p.eventId) return false;
+  if (selectedEventFilter !== "all" && selectedEventFilter !== "direct" && p.eventId !== selectedEventFilter) return false;
   if (!searchQuery.trim()) return true;
   const q = searchQuery.toLowerCase();
   return (p.name || "").toLowerCase().includes(q) ||
@@ -697,6 +863,14 @@ const b64 = compressed;
       <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes scanPulse { 0%,100%{opacity:1;transform:scaleX(1)} 50%{opacity:0.6;transform:scaleX(0.97)} } @keyframes fadeSlideUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }`}</style>
 
       {/* Camera modal */}
+      {showEventModal && (
+  <EventAssignModal
+    events={events}
+    onSelect={handleSelectEvent}
+    onCreateNew={handleCreateEvent}
+    onSkip={handleSkip}
+  />
+)}
       {cameraOpen && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 500,
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20 }}>
@@ -797,37 +971,67 @@ const b64 = compressed;
             </div>
           </div>
 
-          {/* Event Filter */}
-          {events.length > 0 && (
-            <div style={{ padding: "8px 12px", borderBottom: "1px solid #EEF2F7", flexShrink: 0 }}>
-              <div style={{ fontSize: 9, color: C.textDim, fontFamily: MONO,
-                letterSpacing: "0.08em", marginBottom: 6 }}>FILTER BY EVENT</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <button
-                  onClick={() => setSelectedEventFilter("all")}
-                  style={{ textAlign: "left", padding: "5px 8px", borderRadius: 6, border: "none",
-                    background: selectedEventFilter === "all" ? C.goldDim : "transparent",
-                    color: selectedEventFilter === "all" ? C.gold : C.textMid,
-                    fontSize: 11, fontFamily: FONT, cursor: "pointer", fontWeight: selectedEventFilter === "all" ? 600 : 400 }}>
-                  📋 All Events ({scannedProspects.length})
-                </button>
-                {events.map(ev => {
-                  const count = scannedProspects.filter(p => p.eventId === ev.id).length;
-                  return (
-                    <button key={ev.id}
-                      onClick={() => setSelectedEventFilter(ev.id)}
+         {/* Event Filter — collapsible */}
+          {(events.length > 0 || scannedProspects.some(p => !p.eventId)) && (
+            <div style={{ borderBottom: "1px solid #EEF2F7", flexShrink: 0 }}>
+              <button
+                onClick={() => setEventsExpanded(p => !p)}
+                style={{ width: "100%", padding: "8px 12px", border: "none", background: "none",
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  cursor: "pointer", fontFamily: MONO, fontSize: 9, color: C.textDim,
+                  letterSpacing: "0.08em" }}>
+                <span>FILTER BY EVENT</span>
+                <span style={{ fontSize: 11, transition: "transform 0.2s",
+                  transform: eventsExpanded ? "rotate(0deg)" : "rotate(-90deg)" }}>▾</span>
+              </button>
+
+              {eventsExpanded && (
+                <div style={{ padding: "0 12px 8px", maxHeight: 260, overflowY: "auto",
+                  display: "flex", flexDirection: "column", gap: 4 }}>
+                  <button onClick={() => setSelectedEventFilter("all")}
+                    style={{ textAlign: "left", padding: "5px 8px", borderRadius: 6, border: "none",
+                      background: selectedEventFilter === "all" ? C.goldDim : "transparent",
+                      color: selectedEventFilter === "all" ? C.gold : C.textMid,
+                      fontSize: 11, fontFamily: FONT, cursor: "pointer",
+                      fontWeight: selectedEventFilter === "all" ? 600 : 400 }}>
+                    📋 All Events ({scannedProspects.length})
+                  </button>
+
+                  {scannedProspects.filter(p => !p.eventId).length > 0 && (
+                    <button onClick={() => setSelectedEventFilter("direct")}
                       style={{ textAlign: "left", padding: "5px 8px", borderRadius: 6, border: "none",
-                        background: selectedEventFilter === ev.id ? C.goldDim : "transparent",
-                        color: selectedEventFilter === ev.id ? C.gold : C.textMid,
-                        fontSize: 11, fontFamily: FONT, cursor: "pointer", fontWeight: selectedEventFilter === ev.id ? 600 : 400,
+                        background: selectedEventFilter === "direct" ? C.goldDim : "transparent",
+                        color: selectedEventFilter === "direct" ? C.gold : C.textMid,
+                        fontSize: 11, fontFamily: FONT, cursor: "pointer",
+                        fontWeight: selectedEventFilter === "direct" ? 600 : 400,
                         display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span>🎪 {ev.name}</span>
+                      <span>📷 Direct Scans</span>
                       <span style={{ fontSize: 9, fontFamily: MONO, background: "#EEF2F7",
-                        padding: "1px 6px", borderRadius: 10, color: C.textDim }}>{count}</span>
+                        padding: "1px 6px", borderRadius: 10, color: C.textDim }}>
+                        {scannedProspects.filter(p => !p.eventId).length}
+                      </span>
                     </button>
-                  );
-                })}
-              </div>
+                  )}
+
+                  {events.map(ev => {
+                    const count = scannedProspects.filter(p => p.eventId === ev.id).length;
+                    if (count === 0) return null;
+                    return (
+                      <button key={ev.id} onClick={() => setSelectedEventFilter(ev.id)}
+                        style={{ textAlign: "left", padding: "5px 8px", borderRadius: 6, border: "none",
+                          background: selectedEventFilter === ev.id ? C.goldDim : "transparent",
+                          color: selectedEventFilter === ev.id ? C.gold : C.textMid,
+                          fontSize: 11, fontFamily: FONT, cursor: "pointer",
+                          fontWeight: selectedEventFilter === ev.id ? 600 : 400,
+                          display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span>🎪 {ev.name}</span>
+                        <span style={{ fontSize: 9, fontFamily: MONO, background: "#EEF2F7",
+                          padding: "1px 6px", borderRadius: 10, color: C.textDim }}>{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
