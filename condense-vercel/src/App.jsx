@@ -3664,6 +3664,8 @@ const text = (gtmFollowupKeys.includes(activeGtmTab) && gtmFirstName && !gtmAlre
     SUCCESS_STORIES={SUCCESS_STORIES}
     FOLLOWUP_SCHEDULE={FOLLOWUP_SCHEDULE}
     exportProposalPDF={exportProposalPDF}
+    runResearchAgent={runResearchAgent}
+    generateMessages={generateMessages}
   />
 )}
 {activeView === "prospects" && !sel ? (
