@@ -1712,16 +1712,15 @@ const filteredScanned = scanned.filter(p => {
                                   style={{ marginLeft: "auto", fontSize: 10, color: C.textDim, background: "none", border: "none", cursor: "pointer" }}>undo</button>
                               </div>
                             ) : (
-                              onClick={() => {
-  const sentAt = new Date().toISOString();
-  const sentKey = `${sel.id}_sent_${activeMsg}`;
-  const sentVal = { sentAt };
-  // Save to scannedEdits (persisted) instead of parent edits
-  setScannedEdits(prev => ({ ...prev, [sentKey]: sentVal }));
-  scannedDbSave("v3_scanned_edits", sentKey, sentVal);
-  setScannedProspects(prev => prev.map(p => p.id === sel.id
-    ? { ...p, sentLog: { ...(p.sentLog || {}), [activeMsg]: sentAt } } : p));
-}}
+                              <button onClick={() => {
+                                const sentAt = new Date().toISOString();
+                                const sentKey = `${sel.id}_sent_${activeMsg}`;
+                                const sentVal = { sentAt };
+                                setScannedEdits(prev => ({ ...prev, [sentKey]: sentVal }));
+                                scannedDbSave("v3_scanned_edits", sentKey, sentVal);
+                                setScannedProspects(prev => prev.map(p => p.id === sel.id
+                                  ? { ...p, sentLog: { ...(p.sentLog || {}), [activeMsg]: sentAt } } : p));
+                              }}
                                 style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 6,
                                 padding: "8px 16px", borderRadius: 6, border: "1px solid #B8EDD3",
                                 background: "#F0FBF5", color: C.green, fontSize: 12, fontFamily: FONT,
