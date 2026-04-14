@@ -265,19 +265,45 @@ useEffect(() => {
   async function loadScanned() {
     if (!supabase) { setScannedLoaded(true); return; }
     try {
+      // 1. Load events
       const { data: eventsData } = await supabase
         .from("events")
         .select("*")
         .order("created_at", { ascending: false });
       setEvents(eventsData || []);
 
+      // 2. Load contacts from Card Scanner
       const { data: contactsData } = await supabase
         .from("contacts")
         .select("*")
         .order("scanned_at", { ascending: false });
 
+      // 3. Load saved messages/research/edits/status from outreach tables
+      const [savedProspects, savedMsgs, savedResearch, savedEdits] = await Promise.all([
+        supabase.from("v3_scanned_prospects").select("id, data"),
+        supabase.from("v3_scanned_messages").select("id, data"),
+        supabase.from("v3_scanned_research").select("id, data"),
+        supabase.from("v3_scanned_edits").select("id, data"),
+      ]);
+
+      // Build lookup maps from saved data
+      const savedProspectsMap = Object.fromEntries(
+        (savedProspects.data || []).map(r => [r.id, r.data])
+      );
+      const savedMsgsMap = Object.fromEntries(
+        (savedMsgs.data || []).map(r => [r.id, r.data])
+      );
+      const savedResearchMap = Object.fromEntries(
+        (savedResearch.data || []).map(r => [r.id, r.data])
+      );
+      const savedEditsMap = Object.fromEntries(
+        (savedEdits.data || []).map(r => [r.id, r.data])
+      );
+
+      // 4. Map contacts, merging saved status if exists
       const mapped = (contactsData || []).map(c => {
         const event = (eventsData || []).find(e => e.id === c.event_id);
+        const saved = savedProspectsMap[String(c.id)];
         return {
           id: String(c.id),
           name: `${c.first_name || ""} ${c.last_name || ""}`.trim(),
@@ -292,22 +318,17 @@ useEffect(() => {
           eventName: event ? event.name : "",
           eventLocation: event ? event.location || "" : "",
           source: "scanned",
-          status: "idle",
+          // Restore saved status, sentAt etc — fallback to idle
+          status: saved?.status || "idle",
+          sentAt: saved?.sentAt || null,
           createdAt: c.scanned_at || new Date().toISOString(),
         };
       });
 
       setScannedProspects(mapped);
-
-      // Sync to main Prospects page
-      if (setProspects && dbSave) {
-        setProspects(prev => {
-          const existingIds = new Set(prev.map(p => String(p.id)));
-          const newOnes = mapped.filter(p => !existingIds.has(p.id));
-          newOnes.forEach(p => dbSave(p.id, p));
-          return newOnes.length > 0 ? [...newOnes, ...prev] : prev;
-        });
-      }
+      setScannedMessages(savedMsgsMap);
+      setScannedResearch(savedResearchMap);
+      setScannedEdits(savedEditsMap);
 
     } catch(err) {
       console.error("loadScanned error:", err);
