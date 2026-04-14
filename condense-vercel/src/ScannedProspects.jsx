@@ -493,7 +493,24 @@ useEffect(() => {
   });
 }, []);
 
+ const runScannedAgent = async (p) => {
+  if (!p || running !== null) return;
   
+  // Optimistically set status
+  setScannedProspects(prev => prev.map(sp =>
+    sp.id === p.id ? { ...sp, status: "researching" } : sp
+  ));
+  scannedDbSave("v3_scanned_prospects", p.id, { ...p, status: "researching" });
+
+  try {
+    await runAgent(p);
+  } catch (err) {
+    setScannedProspects(prev => prev.map(sp =>
+      sp.id === p.id ? { ...sp, status: "error" } : sp
+    ));
+    scannedDbSave("v3_scanned_prospects", p.id, { ...p, status: "error" });
+  }
+}; 
 useEffect(() => {
   scannedProspects.forEach(p => {
     if (p.status !== "researching" && p.status !== "generating") return;
