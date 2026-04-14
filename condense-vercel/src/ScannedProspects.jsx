@@ -126,7 +126,7 @@ function PrimaryBtn({ onClick, disabled, children, color = C.gold }) {
 }
 
 // ─── CARD EXTRACTION via /api/gemini (same Gemini route used by the rest of the app) ──
-async function extractCardWithClaude(base64Image, mediaType) {
+async function extractCardDetails(base64Image, mediaType) {
   const body = {
     contents: [{
       role: "user",
@@ -179,7 +179,86 @@ const end   = cleaned.lastIndexOf("}");
 if (start === -1 || end === -1) throw new Error("No JSON in response");
 return JSON.parse(cleaned.slice(start, end + 1));
 }
+async function generateScannedMessages(prospect, research, eventName, eventLocation, discussionNotes, extraContext, onLog) {
+  onLog("✍️ Crafting event-continuation messages...");
+  const firstName = (prospect.name || "").split(" ")[0] || "";
+  const hasEvent = !!(eventName && eventName !== "Direct Scan");
 
+  const prompt = `You are Veera Raghavan, Head of Enterprise Sales at Zeliot (Bosch-backed).
+
+You met ${prospect.name} (${prospect.jobTitle || ""}) at ${hasEvent ? eventName : "a recent meeting"} and scanned their business card. Now following up.
+
+PROSPECT: ${prospect.name} | ${prospect.jobTitle} | ${prospect.company}
+EVENT: ${hasEvent ? `${eventName}${eventLocation ? ` (${eventLocation})` : ""}` : "Direct meeting"}
+DISCUSSION NOTES FROM EVENT: ${discussionNotes || "Not mentioned"}
+EXTRA CONTEXT ADDED BY VEERA: ${extraContext || "None added"}
+RESEARCH: ${research ? `${research.company_overview || ""} | Pains: ${(research.pain_points||[]).join(", ")}` : "None"}
+
+═══ REAL EXAMPLE — COPY THIS STYLE EXACTLY ═══
+Subject: Scania <> Zeliot (Continuation from Excon)
+
+Hi Jayasimha,
+
+Following up on our discussion at Excon 23, I'm excited to share the attached Zeliot mining solution for Scania vehicles.
+
+As per our discussion at Excon, I have exclusively prepared a deck on mining operations. We would be delighted to showcase a live demo of the entire Zeliot mining solution at your convenience. This presents a great opportunity to experience the capabilities of the system firsthand and discuss how it can specifically benefit stakeholders of mining operations.
+
+Please let me know your availability for a demo, and we'll be happy to schedule a time that works best for you. We're confident that the Zeliot mining solution can make a real difference and provide the value addition to your stakeholders.
+
+Thanks & Regards
+═══ END EXAMPLE ═══
+
+RULES:
+- email_subject: "${prospect.company} <> Zeliot${hasEvent ? ` (Continuation from ${eventName})` : ""}"
+- email_body: Start "Hi ${firstName}," → "Following up on our discussion at [event]..." → reference SPECIFIC points from DISCUSSION NOTES and EXTRA CONTEXT (e.g. if notes say "mining operations" mention mining, if notes say "fleet management" mention fleet) → "I have exclusively prepared a [deck/demo/use case] on [specific topic from notes]..."
+- CRITICAL: If discussion notes or extra context mention specific topics (mining, fleet, ADAS, telematics, charging, supply chain etc.) — use those exact topics in EVERY message. Never be generic if context is available.
+- CRITICAL: If extra context mentions where they met, pain points discussed, products shown, commitments made — weave all of that naturally into the messages.
+- 150-220 words total. Warm, personal, NOT a long pitch.
+- connection_note: Max 300 chars. "Great connecting at [event]! Would love to follow up on our discussion — connecting here so we can stay in touch."
+- day0_message: 80-120 words. "Hi ${firstName}," → reference event + what was discussed → specific next step (demo/deck)
+- day3_followup: 60-80 words. Different angle — one specific Condense capability tied to their discussion
+- day7_followup: 40-60 words. Reference a customer metric or success story
+- day14_followup: 25-40 words. Final gentle nudge
+- email_followup1: 3-4 short paragraphs, start directly (no greeting), no signature
+- email_followup2: 2-3 short paragraphs, start directly, reference a metric, no signature
+
+MANDATORY pre-read block in email_body — include word for word:
+As a pre-read, sharing the below information on Condense.
+- Condense Overview: https://docs.zeliot.in/condense
+- Case Studies: https://www.zeliot.in/blog
+- About Zeliot: www.zeliot.in/quick-links
+- Get Started with Condense: https://bit.ly/3NmxJpe
+
+Return ONLY valid JSON:
+{
+  "connection_note": "...",
+  "day0_message": "...",
+  "day3_followup": "...",
+  "day7_followup": "...",
+  "day14_followup": "...",
+  "email_subject": "...",
+  "email_body": "...",
+  "email_followup1": "...",
+  "email_followup2": "...",
+  "objections": [
+    {"title": "We already have a solution", "response": "..."},
+    {"title": "Not the right time", "response": "..."},
+    {"title": "Send more info", "response": "..."}
+  ]
+}`;
+
+  const body = {
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: { maxOutputTokens: 3000, temperature: 0.3, responseMimeType: "application/json" },
+  };
+  const res = await fetch("/api/gemini", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok) throw new Error(`Gemini error ${res.status}`);
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("").trim();
+  onLog("✅ Event-continuation messages ready");
+  return extractJSON(text); // reuse the existing extractJSON function already in the file
+}
 // ─── FILE → BASE64 ───────────────────────────────────────────────────────────
 // ─── FILE → COMPRESSED BASE64 ─────────────────────────────────────────────────
 function fileToBase64(file) {
@@ -493,24 +572,78 @@ useEffect(() => {
   });
 }, []);
 
- const runScannedAgent = async (p) => {
+const runScannedAgent = async (p) => {
   if (!p || running !== null) return;
-  
-  // Optimistically set status
+  const id = p.id;
+  setRunning(id);
+
   setScannedProspects(prev => prev.map(sp =>
-    sp.id === p.id ? { ...sp, status: "researching" } : sp
+    sp.id === id ? { ...sp, status: "researching" } : sp
   ));
-  scannedDbSave("v3_scanned_prospects", p.id, { ...p, status: "researching" });
+  scannedDbSave("v3_scanned_prospects", id, { ...p, status: "researching" });
+  addLog(id, `🔍 Researching ${p.company}...`);
 
   try {
-    await runAgent(p);
+    // Step 1: Research
+    let researchData = scannedResearch[id] || null;
+    if (!researchData && runResearchAgent) {
+      researchData = await runResearchAgent(
+        p.company, p.linkedinUrl || "", p.name, p.jobTitle || "",
+        p.notes || "", (msg) => addLog(id, msg)
+      );
+      setScannedResearch(prev => ({ ...prev, [id]: researchData }));
+      scannedDbSave("v3_scanned_research", id, researchData);
+    }
+
+    // Step 2: Generate event-context messages (NOT cold pitch)
+    setScannedProspects(prev => prev.map(sp =>
+      sp.id === id ? { ...sp, status: "generating" } : sp
+    ));
+    addLog(id, "✍️ Generating event-continuation messages...");
+
+  const discussionNotes = p.notes || "";
+const extra = extraContext[id] || "";
+const combinedContext = [discussionNotes, extra].filter(Boolean).join("\n");
+addLog(id, combinedContext
+  ? `💬 Using discussion context: "${combinedContext.slice(0, 80)}..."`
+  : "⚠️ No discussion notes — add extra context for better personalization"
+);
+
+const msgs = await generateScannedMessages(
+  p,
+  researchData,
+  p.eventName || "",
+  p.eventLocation || "",
+  discussionNotes,
+  extra,
+  (msg) => addLog(id, msg)
+);
+
+    setScannedMessages(prev => ({ ...prev, [id]: msgs }));
+    scannedDbSave("v3_scanned_messages", id, msgs);
+
+    setScannedProspects(prev => prev.map(sp => {
+      if (sp.id !== id) return sp;
+      const updated = { ...sp, status: "ready" };
+      scannedDbSave("v3_scanned_prospects", id, updated);
+      return updated;
+    }));
+
+    addLog(id, "🚀 Done! Event-continuation messages ready.");
+    setActiveMsg("connection_note");
+    setActiveTab("messages");
+
   } catch (err) {
     setScannedProspects(prev => prev.map(sp =>
-      sp.id === p.id ? { ...sp, status: "error" } : sp
+      sp.id === id ? { ...sp, status: "error" } : sp
     ));
-    scannedDbSave("v3_scanned_prospects", p.id, { ...p, status: "error" });
+    scannedDbSave("v3_scanned_prospects", id, { ...p, status: "error" });
+    addLog(id, "❌ Error: " + err.message);
+    addLog(id, "💡 Click ↺ Regen to retry.");
+  } finally {
+    setRunning(null);
   }
-}; 
+};
 useEffect(() => {
   scannedProspects.forEach(p => {
     if (p.status !== "researching" && p.status !== "generating") return;
@@ -532,7 +665,7 @@ useEffect(() => {
     try {
       const b64  = await fileToBase64(file);
       const mime = file.type || "image/jpeg";
-      const data = await extractCardWithClaude(b64, mime);
+      const data = await extractCardDetails(b64, mime);
       setExtracted(data);
       setEditForm({ ...data });
       setScanSuccess("✅ Card scanned — review details below then save.");
@@ -594,7 +727,7 @@ useEffect(() => {
   return c2.toDataURL("image/jpeg", 0.75).split(",")[1];
 })();
 const b64 = compressed;
-      const data = await extractCardWithClaude(b64, "image/jpeg");
+      const data = await extractCardDetails(b64, "image/jpeg");
       setExtracted(data);
       setEditForm({ ...data });
       setScanSuccess("✅ Card captured — review details below then save.");
@@ -990,7 +1123,7 @@ const b64 = compressed;
                   <div style={{ fontFamily: DISPLAY, fontSize: 18, fontWeight: 700,
                     color: C.navy, letterSpacing: "-0.02em" }}>Business Card Scanner</div>
                   <div style={{ fontSize: 12, color: C.textDim, marginTop: 3 }}>
-                    Snap or upload a card — Claude extracts all contact details instantly
+                   Snap or upload a card — all contact details extracted instantly
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 10 }}>
@@ -1022,8 +1155,7 @@ const b64 = compressed;
                   <Spinner />
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: C.navy }}>Reading card...</div>
-                    <div style={{ fontSize: 11, color: C.textDim, fontFamily: MONO }}>Claude is extracting contact details</div>
-                  </div>
+                   <div style={{ fontSize: 11, color: C.textDim, fontFamily: MONO }}>Extracting contact details...</div>
                 </div>
               )}
 
