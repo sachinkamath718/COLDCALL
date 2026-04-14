@@ -261,7 +261,7 @@ const [events, setEvents]                     = useState([]);
 const [selectedEventFilter, setSelectedEventFilter] = useState("all");
   const [cameraOpen, setCameraOpen]       = useState(false);
   const [cameraStream, setCameraStream]   = useState(null);
- useEffect(() => {
+useEffect(() => {
   async function loadScanned() {
     if (!supabase) { setScannedLoaded(true); return; }
     try {
@@ -276,23 +276,39 @@ const [selectedEventFilter, setSelectedEventFilter] = useState("all");
         .select("*")
         .order("scanned_at", { ascending: false });
 
-      const mapped = (contactsData || []).map(c => ({
-        id: c.id,
-        name: `${c.first_name || ""} ${c.last_name || ""}`.trim(),
-        firstName: c.first_name || "",
-        lastName: c.last_name || "",
-        company: c.company_name || "",
-        jobTitle: c.job_title || "",
-        email: c.email || "",
-        phone: c.phone_number || "",
-        notes: c.discussion_details || "",
-        eventId: c.event_id || "",
-        source: "scanned",
-        status: "idle",
-        createdAt: c.scanned_at || new Date().toISOString(),
-      }));
+      const mapped = (contactsData || []).map(c => {
+        const event = (eventsData || []).find(e => e.id === c.event_id);
+        return {
+          id: String(c.id),
+          name: `${c.first_name || ""} ${c.last_name || ""}`.trim(),
+          firstName: c.first_name || "",
+          lastName: c.last_name || "",
+          company: c.company_name || "",
+          jobTitle: c.job_title || "",
+          email: c.email || "",
+          phone: c.phone_number || "",
+          notes: c.discussion_details || "",
+          eventId: c.event_id || "",
+          eventName: event ? event.name : "",
+          eventLocation: event ? event.location || "" : "",
+          source: "scanned",
+          status: "idle",
+          createdAt: c.scanned_at || new Date().toISOString(),
+        };
+      });
 
       setScannedProspects(mapped);
+
+      // Sync to main Prospects page
+      if (setProspects && dbSave) {
+        setProspects(prev => {
+          const existingIds = new Set(prev.map(p => String(p.id)));
+          const newOnes = mapped.filter(p => !existingIds.has(p.id));
+          newOnes.forEach(p => dbSave(p.id, p));
+          return newOnes.length > 0 ? [...newOnes, ...prev] : prev;
+        });
+      }
+
     } catch(err) {
       console.error("loadScanned error:", err);
     }
