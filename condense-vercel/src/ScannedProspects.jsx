@@ -230,7 +230,7 @@ RULES:
 - email_body: Start "Hi ${firstName}," → "Following up on our discussion at [event]..." → reference SPECIFIC points from DISCUSSION NOTES and EXTRA CONTEXT (e.g. if notes say "mining operations" mention mining, if notes say "fleet management" mention fleet) → "I have exclusively prepared a [deck/demo/use case] on [specific topic from notes]..."
 - CRITICAL: If discussion notes or extra context mention specific topics (mining, fleet, ADAS, telematics, charging, supply chain etc.) — use those exact topics in EVERY message. Never be generic if context is available.
 - CRITICAL: If extra context mentions where they met, pain points discussed, products shown, commitments made — weave all of that naturally into the messages.
-- 150-220 words total. Warm, personal, NOT a long pitch.
+- 150-220 words total. Warm, personal, NOT a long pitch,no signature.
 - connection_note: Max 300 chars. "Great connecting at [event]! Would love to follow up on our discussion — connecting here so we can stay in touch."
 - day0_message: 80-120 words. "Hi ${firstName}," → reference event + what was discussed → specific next step (demo/deck)
 - day3_followup: 60-80 words. Different angle — one specific Condense capability tied to their discussion
