@@ -394,7 +394,7 @@ Job Title: ${prospect.jobTitle}
 Email: ${prospect.email}
 Event: ${eventName}${eventLocation ? ` in ${eventLocation}` : ""}
 Discussion Points from meeting: ${prospect.notes || "General discussion about Zeliot Condense platform"}
-
+Additional Context provided by sender: ${extraContext[prospect.id] || "None"}
 ABOUT ZELIOT CONDENSE:
 - Real-time data streaming platform for connected mobility
 - Low-code/no-code pipeline builder
@@ -422,16 +422,14 @@ If you are exploring how to modernise or scale your mobility data stack, you can
 Would you be open to a quick 15-minute discussion to map your current architecture and see where Condense can help? You can pick a slot that works for you here: Book a Meeting, or just reply with a preferred time and time zone."
 
 EXAMPLE 2 (when discussion points exist):
-"Hi Bharath,
-I hope you had a pleasant journey back from the Bharat Mobility Expo. It was a pleasure meeting you.
+"Hi Jayasimha,
+Following up on our discussion at Excon 23, I'm excited to share how Zeliot's Condense platform can address the specific needs we discussed.
 
-In our discussions, we touched upon the following points:
-- USP of our Connected Vehicle platform "Condense" and the solutions it could power.
-- Edge analytics capability of CondenseEdge and its unique value proposition.
-- [Their specific requirements]
+As per our discussion at Excon, I have exclusively prepared insights on [discussion topic]. We would be delighted to showcase a live demo of the entire Zeliot Condense platform at your convenience. This presents a great opportunity to experience the capabilities of the system firsthand and discuss how it can specifically benefit ${prospect.company}.
 
-I am excited about the prospect of further exploring how Zeliot's innovative solutions can cater to your specific needs. To this end, I kindly request you to let us know your availability for a more in-depth discussion in the coming week."
+Please let me know your availability for a demo, and we'll be happy to schedule a time that works best for you. We're confident that Zeliot Condense can make a real difference and provide significant value to your operations.
 
+Thanks & Regards,"
 RULES:
 - Always use first name only (${prospect.firstName || prospect.name.split(" ")[0]})
 - Always reference the specific event: "${eventName}"
@@ -443,15 +441,26 @@ RULES:
 Generate ALL these messages:
 
 connection_note: Max 300 chars. Warm LinkedIn note referencing ${eventName}.
-day0_message: LinkedIn first message after connecting. Reference event + discussion points if any. 80-120 words.
-day3_followup: 50-80 words. Different angle. Reference a specific Condense capability.
+day0_message: LinkedIn first message after connecting. Reference event + discussion points if any. If additional context exists, use it to personalise. 80-120 words.
+day3_followup: 50-80 words. Different angle. If additional context mentions a specific pain/tech/use case, reference that. Otherwise reference a specific Condense capability.
 day7_followup: 30-50 words. Soft follow-up. Mention free trial.
 day14_followup: 20-35 words. Final gentle nudge.
 email_subject: Under 60 chars. Format: "Zeliot <> ${prospect.company} | Continuation from ${eventName}"
-email_body: Full email exactly like Example 1 or 2 above. 300-400 words. Reference discussion points if available. Include these links:
-  - Condense overview: https://zeliot.in/condense
-  - Case studies: https://www.zeliot.in/blog
-  - Book meeting: https://calendly.com/zeliot
+email_body: Full email following this EXACT structure:
+- Line 1: "Hi [FirstName],"
+- Line 2: "Following up on our discussion at ${eventName}, [one line about excitement to continue]."
+- Line 3: "As per our discussion at ${eventName}, I have exclusively prepared [reference to discussion points: ${prospect.notes}]. We would be delighted to showcase a live demo of the entire Zeliot Condense platform at your convenience. This presents a great opportunity to experience the capabilities of the system firsthand and discuss how it can specifically benefit [company]."
+- If discussion_details exist, add: "In our discussion, we specifically touched upon: [list each discussion point as a bullet]"
+- Line: "Please let me know your availability for a demo, and we'll be happy to schedule a time that works best for you. We're confident that Zeliot Condense can make a real difference and provide significant value addition to your stakeholders."
+- End with: "Thanks & Regards,"
+- NO signature block, NO links unless naturally fitting
+- Keep it 150-250 words. Warm, specific, not salesy.
+- If NO discussion points: use Example 1 style with Condense feature bullets instead.
+- If "Additional Context provided by sender" exists, weave it naturally into the email body. 
+  For example if it says "he was interested in mining use case" mention that specifically.
+  If it says "he uses Kafka" mention Condense as a simpler alternative to Kafka.
+  If it says "met at booth 23B" mention that specifically.
+  Always prioritise additional context over generic content.
 email_followup1: 3-4 short paragraphs. Different angle. No salutation. No signature.
 email_followup2: 2-3 short paragraphs. Final nudge. No salutation. No signature.
 
