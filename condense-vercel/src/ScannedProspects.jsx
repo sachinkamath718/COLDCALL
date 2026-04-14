@@ -1378,7 +1378,7 @@ const b64 = compressed;
                       {/* Fetch Phone — show if no phone */}
                       {!sel.phone && (
                         <button onClick={async () => {
-                          setProspects(prev => prev.map(p => p.id === sel.id ? { ...p, _phoneFetching: true } : p));
+                         setScannedProspects(prev => prev.map(p => p.id === sel.id ? { ...p, _phoneFetching: true } : p));
                           try {
                             const res = await fetch("/api/enrich-phone", {
                               method: "POST", headers: { "Content-Type": "application/json" },
@@ -1387,12 +1387,12 @@ const b64 = compressed;
                             if (!res.ok) throw new Error(`HTTP ${res.status}`);
                             const data = await res.json();
                             if (data.found && data.phone) {
-                              setProspects(prev => prev.map(p => p.id === sel.id ? { ...p, phone: data.phone, _phoneFetching: false } : p));
+                              setScannedProspects(prev => prev.map(p => p.id === sel.id ? { ...p, phone: data.phone, _phoneFetching: false } : p));
                             } else {
-                              setProspects(prev => prev.map(p => p.id === sel.id ? { ...p, _phoneFetching: false } : p));
+                              setScannedProspects(prev => prev.map(p => p.id === sel.id ? { ...p, _phoneFetching: false } : p));
                             }
                           } catch {
-                            setProspects(prev => prev.map(p => p.id === sel.id ? { ...p, _phoneFetching: false } : p));
+                            setScannedProspects(prev => prev.map(p => p.id === sel.id ? { ...p, _phoneFetching: false } : p));
                           }
                         }} disabled={sel._phoneFetching}
                           style={{ padding: "8px 14px", borderRadius: 6, border: "1px solid #0D9E6E44",
@@ -1406,7 +1406,7 @@ const b64 = compressed;
                       {/* Zoho CRM Push */}
                       {selM && (
                         <button onClick={async () => {
-                          setProspects(prev => prev.map(p => p.id === sel.id ? { ...p, _zohoPushing: true, _zohoStatus: null } : p));
+                         setScannedProspects(prev => prev.map(p => p.id === sel.id ? { ...p, _zohoPushing: true, _zohoStatus: null } : p));
                           try {
                             const res = await fetch("/api/zoho-push", {
                               method: "POST", headers: { "Content-Type": "application/json" },
@@ -1414,11 +1414,11 @@ const b64 = compressed;
                             });
                             const d = await res.json();
                             const ok = d.data?.[0]?.status === "success";
-                            setProspects(prev => prev.map(p => p.id === sel.id ? { ...p, _zohoPushing: false, _zohoStatus: ok ? "success" : "error" } : p));
-                            setTimeout(() => setProspects(prev => prev.map(p => p.id === sel.id ? { ...p, _zohoStatus: null } : p)), 4000);
+                            setScannedProspects(prev => prev.map(p => p.id === sel.id ? { ...p, _zohoPushing: false, _zohoStatus: ok ? "success" : "error" } : p));
+                           setTimeout(() => setScannedProspects(prev => prev.map(p => p.id === sel.id ? { ...p, _zohoStatus: null } : p)), 4000);
                           } catch {
-                            setProspects(prev => prev.map(p => p.id === sel.id ? { ...p, _zohoPushing: false, _zohoStatus: "error" } : p));
-                            setTimeout(() => setProspects(prev => prev.map(p => p.id === sel.id ? { ...p, _zohoStatus: null } : p)), 4000);
+                            setScannedProspects(prev => prev.map(p => p.id === sel.id ? { ...p, _zohoPushing: false, _zohoStatus: "error" } : p));
+                           setTimeout(() => setScannedProspects(prev => prev.map(p => p.id === sel.id ? { ...p, _zohoStatus: null } : p)), 4000);
                           }
                         }} disabled={sel._zohoPushing}
                           style={{ padding: "8px 14px", borderRadius: 6, fontSize: 11, fontFamily: FONT, fontWeight: 500,
@@ -1452,7 +1452,7 @@ const b64 = compressed;
 
                       {/* Complete */}
                       {sel.status === "following" && (
-                        <button onClick={() => setProspects(prev => prev.map(p => p.id === sel.id ? { ...p, status: "done" } : p))}
+                        <button onClick={() => setScannedProspects(prev => prev.map(p => p.id === sel.id ? { ...p, status: "done" } : p))}
                           style={{ padding: "8px 14px", borderRadius: 6, border: `1px solid ${C.green}44`,
                             background: C.greenDim, color: C.green, fontSize: 11, fontFamily: FONT,
                             fontWeight: 500, cursor: "pointer" }}>✓ Complete</button>
@@ -1663,8 +1663,8 @@ const b64 = compressed;
                               <button onClick={() => {
                                 const sentAt = new Date().toISOString();
                                 setEdits(prev => ({ ...prev, [`${sel.id}_sent_${activeMsg}`]: { sentAt } }));
-                                setProspects(prev => prev.map(p => p.id === sel.id
-                                  ? { ...p, sentLog: { ...(p.sentLog || {}), [activeMsg]: sentAt } } : p));
+                               setScannedProspects(prev => prev.map(p => p.id === sel.id
+  ? { ...p, sentLog: { ...(p.sentLog || {}), [activeMsg]: sentAt } } : p));
                               }} style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 6,
                                 padding: "8px 16px", borderRadius: 6, border: "1px solid #B8EDD3",
                                 background: "#F0FBF5", color: C.green, fontSize: 12, fontFamily: FONT,
