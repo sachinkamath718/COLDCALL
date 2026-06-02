@@ -1102,9 +1102,13 @@ useEffect(() => {
   replies.forEach(r => dbSave('v3_replies', r.id, r));
 }, [replies, dbLoaded]);
 
+const lastSavedNotifsRef = useRef('');
+
 useEffect(() => {
   if (!dbLoaded) return;
-  // Prevent infinite loops by only saving if we have notifications and we don't save repeatedly.
+  const currentStr = JSON.stringify(notifications);
+  if (currentStr === lastSavedNotifsRef.current) return;
+  lastSavedNotifsRef.current = currentStr;
   notifications.forEach(n => dbSave('v3_notifications', n.id || `n_${Date.now()}`, n));
 }, [notifications, dbLoaded]);
   
