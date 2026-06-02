@@ -480,7 +480,7 @@ useEffect(() => {
         savedEdits,
       ] = await Promise.all([
         supabase.from("events").select("*").order("id", { ascending: false }),
-        supabase.from("contacts").select("*").order("id", { ascending: false }).limit(200),
+        supabase.from("contacts").select("id, first_name, last_name, company_name, job_title, email, phone_number, discussion_details, event_id, scanned_at").order("id", { ascending: false }).limit(200),
         supabase.from("v3_scanned_prospects").select("id, data"),
         supabase.from("v3_scanned_messages").select("id, data"),
         supabase.from("v3_scanned_research").select("id, data"),
