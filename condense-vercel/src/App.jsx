@@ -1077,28 +1077,48 @@ const [gtmForm, setGtmForm] = useState({ Company: "", HQ: "", Employees: "", "Da
   
 
   // Persist state changes
-  useEffect(() => {
+const lastSavedProspectsRef = useRef('');
+useEffect(() => {
   if (!dbLoaded) return;
+  const currentStr = JSON.stringify(prospects);
+  if (currentStr === lastSavedProspectsRef.current) return;
+  lastSavedProspectsRef.current = currentStr;
   prospects.forEach(p => dbSave('v3_prospects', p.id, p));
 }, [prospects, dbLoaded]);
 
+const lastSavedResearchRef = useRef('');
 useEffect(() => {
   if (!dbLoaded) return;
+  const currentStr = JSON.stringify(research);
+  if (currentStr === lastSavedResearchRef.current) return;
+  lastSavedResearchRef.current = currentStr;
   Object.entries(research).forEach(([id, val]) => dbSave('v3_research', id, val));
 }, [research, dbLoaded]);
 
+const lastSavedMessagesRef = useRef('');
 useEffect(() => {
   if (!dbLoaded) return;
+  const currentStr = JSON.stringify(messages);
+  if (currentStr === lastSavedMessagesRef.current) return;
+  lastSavedMessagesRef.current = currentStr;
   Object.entries(messages).forEach(([id, val]) => dbSave('v3_messages', id, val));
 }, [messages, dbLoaded]);
 
+const lastSavedEditsRef = useRef('');
 useEffect(() => {
   if (!dbLoaded) return;
+  const currentStr = JSON.stringify(edits);
+  if (currentStr === lastSavedEditsRef.current) return;
+  lastSavedEditsRef.current = currentStr;
   Object.entries(edits).forEach(([id, val]) => dbSave('v3_edits', id, val));
 }, [edits, dbLoaded]);
 
+const lastSavedRepliesRef = useRef('');
 useEffect(() => {
   if (!dbLoaded) return;
+  const currentStr = JSON.stringify(replies);
+  if (currentStr === lastSavedRepliesRef.current) return;
+  lastSavedRepliesRef.current = currentStr;
   replies.forEach(r => dbSave('v3_replies', r.id, r));
 }, [replies, dbLoaded]);
 
@@ -1112,27 +1132,48 @@ useEffect(() => {
   notifications.forEach(n => dbSave('v3_notifications', n.id || `n_${Date.now()}`, n));
 }, [notifications, dbLoaded]);
   
-  useEffect(() => {
+const lastSavedRatingsRef = useRef('');
+useEffect(() => {
   if (!dbLoaded) return;
+  const currentStr = JSON.stringify(ratings);
+  if (currentStr === lastSavedRatingsRef.current) return;
+  lastSavedRatingsRef.current = currentStr;
   Object.entries(ratings).forEach(([id, val]) => dbSave('v3_ratings', id, val));
 }, [ratings, dbLoaded]);
 
+const lastSavedTrainingRef = useRef('');
 useEffect(() => {
   if (!dbLoaded) return;
+  const currentStr = JSON.stringify(trainingExamples);
+  if (currentStr === lastSavedTrainingRef.current) return;
+  lastSavedTrainingRef.current = currentStr;
   trainingExamples.forEach(t => dbSave('v3_training', t.id, t));
 }, [trainingExamples, dbLoaded]);
-  useEffect(() => {
+
+const lastSavedGtmRowsRef = useRef('');
+useEffect(() => {
   if (!dbLoaded) return;
+  const currentStr = JSON.stringify(gtmRows);
+  if (currentStr === lastSavedGtmRowsRef.current) return;
+  lastSavedGtmRowsRef.current = currentStr;
   gtmRows.forEach(r => dbSave('v3_gtm_rows', String(r._id), r));
 }, [gtmRows, dbLoaded]);
 
+const lastSavedGtmMRef = useRef('');
 useEffect(() => {
   if (!dbLoaded) return;
+  const currentStr = JSON.stringify(gtmGenerated);
+  if (currentStr === lastSavedGtmMRef.current) return;
+  lastSavedGtmMRef.current = currentStr;
   Object.entries(gtmGenerated).forEach(([id, val]) => dbSave('v3_gtm_messages', id, val));
 }, [gtmGenerated, dbLoaded]);
   
-  useEffect(() => {
+const lastSavedGtmResRef = useRef('');
+useEffect(() => {
   if (!dbLoaded) return;
+  const currentStr = JSON.stringify(gtmResearch);
+  if (currentStr === lastSavedGtmResRef.current) return;
+  lastSavedGtmResRef.current = currentStr;
   Object.entries(gtmResearch).forEach(([id, val]) => dbSave('v3_gtm_research', id, val));
 }, [gtmResearch, dbLoaded]);
   
