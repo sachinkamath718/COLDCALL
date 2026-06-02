@@ -478,10 +478,10 @@ useEffect(() => {
       setEvents(eventsData || []);
 
       let contactsData = [];
-      const { data: initialData, error: contactsError } = await supabase.from("contacts").select("*").order("created_at", { ascending: false });
+      const { data: initialData, error: contactsError } = await supabase.from("contacts").select("*").order("id", { ascending: false }).limit(100);
       if (contactsError) {
-        console.warn("Sorting by created_at failed, retrying without ordering:", contactsError.message);
-        const { data: retryData, error: retryError } = await supabase.from("contacts").select("*");
+        console.warn("Sorting by id failed, retrying without ordering:", contactsError.message);
+        const { data: retryData, error: retryError } = await supabase.from("contacts").select("*").limit(100);
         if (retryError) {
           console.error("Fetch without ordering failed as well:", retryError.message);
         }
