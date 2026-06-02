@@ -1122,15 +1122,7 @@ useEffect(() => {
   replies.forEach(r => dbSave('v3_replies', r.id, r));
 }, [replies, dbLoaded]);
 
-const lastSavedNotifsRef = useRef('');
-
-useEffect(() => {
-  if (!dbLoaded) return;
-  const currentStr = JSON.stringify(notifications);
-  if (currentStr === lastSavedNotifsRef.current) return;
-  lastSavedNotifsRef.current = currentStr;
-  notifications.forEach(n => dbSave('v3_notifications', n.id || `n_${Date.now()}`, n));
-}, [notifications, dbLoaded]);
+// v3_notifications: notifications are derived from prospects — no Supabase persist needed
   
 const lastSavedRatingsRef = useRef('');
 useEffect(() => {
@@ -1187,7 +1179,10 @@ useEffect(() => {
   // Auto-scroll logs
   useEffect(() => { if (logsEndRef.current) logsEndRef.current.scrollIntoView({ behavior: "smooth" }); }, [logs]);
 
-  // Check follow-up notifications periodically
+  // Check follow-up notifications periodically.
+  // IMPORTANT: Use a ref to track added IDs — do NOT put `notifications` in the
+  // dependency array or it creates an infinite re-render loop.
+  const addedNotifIdsRef = useRef(new Set());
   useEffect(() => {
     const checkNotifs = () => {
       const now = new Date();
@@ -1198,10 +1193,11 @@ useEffect(() => {
           const target = new Date(new Date(p.sentAt).getTime() + day * 24 * 60 * 60 * 1000);
           const diffHours = (target - now) / (1000 * 60 * 60);
           if (diffHours <= 24 && diffHours > -48) {
-            const existing = notifications.find(n => n.id === `${p.id}_d${day}` && !n.cleared);
-            if (!existing) {
+            const notifId = `${p.id}_d${day}`;
+            if (!addedNotifIdsRef.current.has(notifId)) {
+              addedNotifIdsRef.current.add(notifId);
               newNotifs.push({
-                id: `${p.id}_d${day}`, name: p.name, company: p.company,
+                id: notifId, name: p.name, company: p.company,
                 message: diffHours <= 0 ? `Day ${day} follow-up is OVERDUE` : `Day ${day} follow-up due in ${Math.ceil(diffHours)}h`,
                 urgent: diffHours <= 0, cleared: false, createdAt: new Date().toISOString(),
               });
@@ -1210,17 +1206,13 @@ useEffect(() => {
         });
       });
       if (newNotifs.length > 0) {
-        setNotifications(prev => {
-          const existingIds = new Set(prev.map(n => n.id));
-          const truly_new = newNotifs.filter(n => !existingIds.has(n.id));
-          return truly_new.length > 0 ? [...prev, ...truly_new] : prev;
-        });
+        setNotifications(prev => [...prev, ...newNotifs]);
       }
     };
     checkNotifs();
     const interval = setInterval(checkNotifs, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [prospects, notifications]);
+  }, [prospects]); // ← only prospects, never notifications
 
   const addLog = (id, msg) => setLogs(prev => ({ ...prev, [id]: [...(prev[id] || []), msg] }));
 
