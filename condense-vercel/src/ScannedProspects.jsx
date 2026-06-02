@@ -477,14 +477,14 @@ useEffect(() => {
         .order("created_at", { ascending: false });
       setEvents(eventsData || []);
 
-      // 2. Load contacts from Card Scanner (order by created_at or fall back if column mismatch)
-      let contactsQuery = supabase.from("contacts").select("*");
-      // Order by created_at as standard fallback since scanned_at is not standard
       let contactsData = [];
-      const { data: initialData, error: contactsError } = await contactsQuery.order("created_at", { ascending: false });
+      const { data: initialData, error: contactsError } = await supabase.from("contacts").select("*").order("created_at", { ascending: false });
       if (contactsError) {
         console.warn("Sorting by created_at failed, retrying without ordering:", contactsError.message);
-        const { data: retryData } = await supabase.from("contacts").select("*");
+        const { data: retryData, error: retryError } = await supabase.from("contacts").select("*");
+        if (retryError) {
+          console.error("Fetch without ordering failed as well:", retryError.message);
+        }
         contactsData = retryData || [];
       } else {
         contactsData = initialData || [];
