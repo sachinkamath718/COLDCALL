@@ -470,51 +470,38 @@ useEffect(() => {
   async function loadScanned() {
     if (!supabase) { setScannedLoaded(true); return; }
     try {
-      // 1. Load events
-      const { data: eventsData } = await supabase
-        .from("events")
-        .select("*")
-        .order("created_at", { ascending: false });
-      setEvents(eventsData || []);
-
-      let contactsData = [];
-      const { data: initialData, error: contactsError } = await supabase.from("contacts").select("*").order("id", { ascending: false }).limit(100);
-      if (contactsError) {
-        console.warn("Sorting by id failed, retrying without ordering:", contactsError.message);
-        const { data: retryData, error: retryError } = await supabase.from("contacts").select("*").limit(100);
-        if (retryError) {
-          console.error("Fetch without ordering failed as well:", retryError.message);
-        }
-        contactsData = retryData || [];
-      } else {
-        contactsData = initialData || [];
-      }
-
-      // 3. Load saved messages/research/edits/status from outreach tables
-      const [savedProspects, savedMsgs, savedResearch, savedEdits] = await Promise.all([
+      // Run ALL queries in parallel — much faster than sequential awaits
+      const [
+        eventsRes,
+        contactsRes,
+        savedProspects,
+        savedMsgs,
+        savedResearch,
+        savedEdits,
+      ] = await Promise.all([
+        supabase.from("events").select("*").order("id", { ascending: false }),
+        supabase.from("contacts").select("*").order("id", { ascending: false }).limit(200),
         supabase.from("v3_scanned_prospects").select("id, data"),
         supabase.from("v3_scanned_messages").select("id, data"),
         supabase.from("v3_scanned_research").select("id, data"),
         supabase.from("v3_scanned_edits").select("id, data"),
       ]);
 
-      // Build lookup maps from saved data
-      const savedProspectsMap = Object.fromEntries(
-        (savedProspects.data || []).map(r => [r.id, r.data])
-      );
-      const savedMsgsMap = Object.fromEntries(
-        (savedMsgs.data || []).map(r => [r.id, r.data])
-      );
-      const savedResearchMap = Object.fromEntries(
-        (savedResearch.data || []).map(r => [r.id, r.data])
-      );
-      const savedEditsMap = Object.fromEntries(
-        (savedEdits.data || []).map(r => [r.id, r.data])
-      );
+      const eventsData = eventsRes.data || [];
+      const contactsData = contactsRes.data || [];
+      if (contactsRes.error) console.warn("contacts load error:", contactsRes.error.message);
 
-      // 4. Map contacts, merging saved status if exists
-      const mapped = (contactsData || []).map(c => {
-        const event = (eventsData || []).find(e => e.id === c.event_id);
+      setEvents(eventsData);
+
+      // Build lookup maps
+      const savedProspectsMap = Object.fromEntries((savedProspects.data || []).map(r => [r.id, r.data]));
+      const savedMsgsMap      = Object.fromEntries((savedMsgs.data      || []).map(r => [r.id, r.data]));
+      const savedResearchMap  = Object.fromEntries((savedResearch.data  || []).map(r => [r.id, r.data]));
+      const savedEditsMap     = Object.fromEntries((savedEdits.data     || []).map(r => [r.id, r.data]));
+
+      // Map contacts, merging saved outreach state
+      const mapped = contactsData.map(c => {
+        const event = eventsData.find(e => e.id === c.event_id);
         const saved = savedProspectsMap[String(c.id)];
         return {
           id: String(c.id),
@@ -530,10 +517,9 @@ useEffect(() => {
           eventName: event ? event.name : "",
           eventLocation: event ? event.location || "" : "",
           source: "scanned",
-          // Restore saved status, sentAt etc — fallback to idle
           status: saved?.status || "idle",
           sentAt: saved?.sentAt || null,
-          createdAt: c.scanned_at || new Date().toISOString(),
+          createdAt: c.scanned_at || c.created_at || new Date().toISOString(),
         };
       });
 
@@ -549,6 +535,7 @@ useEffect(() => {
   }
   loadScanned();
 }, []);
+
 
   const fileInputRef  = useRef();
   const videoRef      = useRef();
