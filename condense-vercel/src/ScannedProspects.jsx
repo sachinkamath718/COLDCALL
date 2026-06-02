@@ -477,11 +477,18 @@ useEffect(() => {
         .order("created_at", { ascending: false });
       setEvents(eventsData || []);
 
-      // 2. Load contacts from Card Scanner
-      const { data: contactsData } = await supabase
-        .from("contacts")
-        .select("*")
-        .order("scanned_at", { ascending: false });
+      // 2. Load contacts from Card Scanner (order by created_at or fall back if column mismatch)
+      let contactsQuery = supabase.from("contacts").select("*");
+      // Order by created_at as standard fallback since scanned_at is not standard
+      let contactsData = [];
+      const { data: initialData, error: contactsError } = await contactsQuery.order("created_at", { ascending: false });
+      if (contactsError) {
+        console.warn("Sorting by created_at failed, retrying without ordering:", contactsError.message);
+        const { data: retryData } = await supabase.from("contacts").select("*");
+        contactsData = retryData || [];
+      } else {
+        contactsData = initialData || [];
+      }
 
       // 3. Load saved messages/research/edits/status from outreach tables
       const [savedProspects, savedMsgs, savedResearch, savedEdits] = await Promise.all([
