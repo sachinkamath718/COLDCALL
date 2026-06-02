@@ -470,17 +470,38 @@ useEffect(() => {
   async function loadScanned() {
     if (!supabase) { setScannedLoaded(true); return; }
     try {
-      // Run ALL queries in parallel — much faster than sequential awaits
+      // Helper: paginate ALL contacts (avoids row limit and statement timeout)
+      async function fetchAllContacts() {
+        const cols = "id, first_name, last_name, company_name, job_title, email, phone_number, discussion_details, event_id, scanned_at";
+        const pageSize = 300;
+        let all = [];
+        let from = 0;
+        while (true) {
+          const { data, error } = await supabase
+            .from("contacts")
+            .select(cols)
+            .order("id", { ascending: false })
+            .range(from, from + pageSize - 1);
+          if (error) { console.warn("contacts page error:", error.message); break; }
+          if (!data || data.length === 0) break;
+          all = [...all, ...data];
+          if (data.length < pageSize) break;
+          from += pageSize;
+        }
+        return all;
+      }
+
+      // Run all queries in parallel — contacts paginates internally
       const [
         eventsRes,
-        contactsRes,
+        contactsData,
         savedProspects,
         savedMsgs,
         savedResearch,
         savedEdits,
       ] = await Promise.all([
         supabase.from("events").select("*").order("id", { ascending: false }),
-        supabase.from("contacts").select("id, first_name, last_name, company_name, job_title, email, phone_number, discussion_details, event_id, scanned_at").order("id", { ascending: false }).limit(200),
+        fetchAllContacts(),
         supabase.from("v3_scanned_prospects").select("id, data"),
         supabase.from("v3_scanned_messages").select("id, data"),
         supabase.from("v3_scanned_research").select("id, data"),
@@ -488,10 +509,8 @@ useEffect(() => {
       ]);
 
       const eventsData = eventsRes.data || [];
-      const contactsData = contactsRes.data || [];
-      if (contactsRes.error) console.warn("contacts load error:", contactsRes.error.message);
-
       setEvents(eventsData);
+
 
       // Build lookup maps
       const savedProspectsMap = Object.fromEntries((savedProspects.data || []).map(r => [r.id, r.data]));
