@@ -1104,6 +1104,7 @@ useEffect(() => {
 
 useEffect(() => {
   if (!dbLoaded) return;
+  // Prevent infinite loops by only saving if we have notifications and we don't save repeatedly.
   notifications.forEach(n => dbSave('v3_notifications', n.id || `n_${Date.now()}`, n));
 }, [notifications, dbLoaded]);
   
@@ -1174,7 +1175,7 @@ useEffect(() => {
     checkNotifs();
     const interval = setInterval(checkNotifs, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [prospects]);
+  }, [prospects, notifications]);
 
   const addLog = (id, msg) => setLogs(prev => ({ ...prev, [id]: [...(prev[id] || []), msg] }));
 
